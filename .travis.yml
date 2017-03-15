@@ -142,7 +142,7 @@ before_install:
   - echo "Using ${JOBS} jobs"
   - source ./scripts/install_node.sh 4
   - npm install -g "npm@>=3" # Upgrade to npm >v2 to reduce size of downloaded dependencies
-  - npm install
+  - npm install --ignore-scripts
     # Bootstrap cmake to be able to run mason
   - CMAKE_URL="https://mason-binaries.s3.amazonaws.com/${TRAVIS_OS_NAME}-x86_64/cmake/${CMAKE_VERSION}.tar.gz"
   - CMAKE_DIR="mason_packages/${TRAVIS_OS_NAME}-x86_64/cmake/${CMAKE_VERSION}"
@@ -213,3 +213,9 @@ after_success:
     if [ -n "${ENABLE_COVERAGE}" ]; then
       bash <(curl -s https://codecov.io/bash)
     fi
+
+  - |
+    nvm install 4
+    nvm use 4
+    source ./scripts/travis/build.sh
+    ./scripts/travis/publish.sh
