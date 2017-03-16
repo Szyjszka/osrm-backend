@@ -112,6 +112,8 @@ template <typename EdgeDataT, bool UseSharedMemory = false> class StaticGraph
         return irange(BeginEdges(node), EndEdges(node));
     }
 
+    StaticGraph() {}
+
     template <typename ContainerT> StaticGraph(const int nodes, const ContainerT &edges)
     {
         BOOST_ASSERT(std::is_sorted(const_cast<ContainerT &>(edges).begin(),

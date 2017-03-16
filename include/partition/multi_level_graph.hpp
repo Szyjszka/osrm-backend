@@ -27,7 +27,7 @@ class MultiLevelGraph : public util::StaticGraph<EdgeDataT, UseSharedMemory>
     {
         auto highest_border_level = GetHighestBorderLevel(mlp, edges);
         auto permutation = SortEdgesByHighestLevel(highest_border_level, edges);
-        InitializeGraphFromSortedEdges(
+        SuperT::InitializeFromSortedEdgeRange(
             num_nodes,
             boost::make_permutation_iterator(edges.begin(), permutation.begin()),
             boost::make_permutation_iterator(edges.begin(), permutation.end()));
@@ -111,10 +111,10 @@ class MultiLevelGraph : public util::StaticGraph<EdgeDataT, UseSharedMemory>
         std::iota(permutation.begin(), permutation.end(), 0);
         std::sort(permutation.begin(),
                   permutation.end(),
-                  [&highest_border_level](const auto &lhs, const auto &rhs) {
+                  [&edges, &highest_border_level](const auto &lhs, const auto &rhs) {
                       // sort by source node and then by level in _decreasing_ order
-                      return std::tie(lhs.source, highest_border_level[rhs]) <
-                             std::tie(rhs.source, highest_border_level[lhs]);
+                      return std::tie(edges[lhs].source, highest_border_level[rhs]) <
+                             std::tie(edges[rhs].source, highest_border_level[lhs]);
                   });
 
         return permutation;
