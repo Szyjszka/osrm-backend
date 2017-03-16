@@ -255,7 +255,7 @@ template <typename EdgeDataT, bool UseSharedMemory = false> class StaticGraph
         });
     }
 
-  private:
+    // private:
     NodeIterator number_of_nodes;
     EdgeIterator number_of_edges;
 
