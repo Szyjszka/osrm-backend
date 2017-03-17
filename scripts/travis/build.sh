@@ -71,9 +71,11 @@ export VERBOSE=1
 if [[ "${ENABLE_COVERAGE}" == "On" ]]; then
     mapbox_time "make" make -j4 coverage
 else
-    mkdir -p build && cd build
+    mkdir -p build
+    pushd build
     cmake .. -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DENABLE_NODE_BINDINGS=On -DENABLE_MASON=On
     mapbox_time "make" make -j4
+    popd
 fi
 
 ## run tests, with backtrace support
