@@ -102,7 +102,7 @@ class MultiLevelGraph : public util::StaticGraph<EdgeDataT, UseSharedMemory>
     EdgeID BeginBorderEdges(const LevelID level, const NodeID node) const
     {
         auto index = node * GetNumberOfLevels();
-        if (index >= node_to_edge_offset.size())
+        if (index >= node_to_edge_offset.size()-1)
             return SuperT::BeginEdges(node);
         else
             return SuperT::BeginEdges(node) + node_to_edge_offset[index + level];

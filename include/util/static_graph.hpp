@@ -130,7 +130,7 @@ template <typename EdgeDataT, bool UseSharedMemory = false> class StaticGraph
 
         number_of_nodes = static_cast<decltype(number_of_nodes)>(node_array.size() - 1);
         number_of_edges = static_cast<decltype(number_of_edges)>(node_array.back().first_edge);
-        BOOST_ASSERT(number_of_edges <= edges.size());
+        BOOST_ASSERT(number_of_edges <= edge_array.size());
     }
 
     unsigned GetNumberOfNodes() const { return number_of_nodes; }

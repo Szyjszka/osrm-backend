@@ -1005,7 +1005,7 @@ class ContiguousInternalMemoryAlgorithmDataFacade<algorithm::MLD>
         util::ShM<QueryGraph::EdgeOffset, true>::vector node_to_offset(
             graph_node_to_offset_ptr, data_layout.num_entries[storage::DataLayout::MLD_GRAPH_NODE_TO_OFFSET]);
 
-        query_graph = QueryGraph(node_list, edge_list, node_to_offset);
+        query_graph = QueryGraph(std::move(node_list), std::move(edge_list), std::move(node_to_offset));
     }
 
     // allocator that keeps the allocation data
@@ -1052,6 +1052,11 @@ class ContiguousInternalMemoryAlgorithmDataFacade<algorithm::MLD>
         return query_graph.GetAdjacentEdgeRange(node);
     }
 
+    EdgeRange GetBorderEdgeRange(const LevelID level, const NodeID node) const override final
+    {
+        return query_graph.GetBorderEdgeRange(level, node);
+    }
+
     // searches for a specific edge
     EdgeID FindEdge(const NodeID from, const NodeID to) const override final
     {
@@ -1060,7 +1065,7 @@ class ContiguousInternalMemoryAlgorithmDataFacade<algorithm::MLD>
 };
 
 template <>
-class ContiguousInternalMemoryDataFacade<algorithm::MLD>
+class ContiguousInternalMemoryDataFacade<algorithm::MLD> final
     : public ContiguousInternalMemoryDataFacadeBase,
       public ContiguousInternalMemoryAlgorithmDataFacade<algorithm::MLD>
 {

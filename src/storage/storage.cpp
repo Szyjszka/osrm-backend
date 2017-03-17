@@ -450,12 +450,14 @@ void Storage::PopulateLayout(DataLayout &layout)
                 reader.ReadVectorSize<customizer::MultiLevelEdgeBasedGraph::NodeArrayEntry>();
             const auto num_edges =
                 reader.ReadVectorSize<customizer::MultiLevelEdgeBasedGraph::EdgeArrayEntry>();
+            const auto num_node_offsets =
+                reader.ReadVectorSize<customizer::MultiLevelEdgeBasedGraph::EdgeOffset>();
 
             layout.SetBlockSize<customizer::MultiLevelEdgeBasedGraph::NodeArrayEntry>(
                 DataLayout::MLD_GRAPH_NODE_LIST, num_nodes);
             layout.SetBlockSize<customizer::MultiLevelEdgeBasedGraph::EdgeArrayEntry>(
                 DataLayout::MLD_GRAPH_EDGE_LIST, num_edges);
-            layout.SetBlockSize<customizer::MultiLevelEdgeBasedGraph::EdgeOffset>(DataLayout::MLD_GRAPH_NODE_TO_OFFSET, num_edges);
+            layout.SetBlockSize<customizer::MultiLevelEdgeBasedGraph::EdgeOffset>(DataLayout::MLD_GRAPH_NODE_TO_OFFSET, num_node_offsets);
         }
         else
         {
