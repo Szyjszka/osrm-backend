@@ -46,12 +46,12 @@ BOOST_AUTO_TEST_SUITE(multi_level_graph)
 
 BOOST_AUTO_TEST_CASE(check_edges_sorting)
 {
-    // node:                0  1  2  3  4  5  6  7  8  9 10 11
-    std::vector<CellID> l1{{0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5}};
-    std::vector<CellID> l2{{0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 3, 3}};
-    std::vector<CellID> l3{{0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1}};
-    std::vector<CellID> l4{{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
-    MultiLevelPartition mlp{{l1, l2, l3, l4}, {5, 4, 2, 1}};
+    // node:                0  1  2  3  4  5  6  7  8  9 10 11 12
+    std::vector<CellID> l1{{0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6}};
+    std::vector<CellID> l2{{0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 3, 3, 4}};
+    std::vector<CellID> l3{{0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 2}};
+    std::vector<CellID> l4{{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
+    MultiLevelPartition mlp{{l1, l2, l3, l4}, {7, 5, 3, 2}};
 
     std::vector<MockEdge> edges = {
         // edges sorted into border/internal by level
@@ -68,7 +68,8 @@ BOOST_AUTO_TEST_CASE(check_edges_sorting)
         {8, 9},   //  i   i   i   i
         {9, 8},   //  i   i   i   i
         {10, 11}, //  i   i   i   i
-        {11, 10}  //  i   i   i   i
+        {11, 10}, //  i   i   i   i
+        {11, 12}  //  b   b   b   b
     };
 
     auto graph = makeGraph(mlp, edges);
@@ -85,7 +86,7 @@ BOOST_AUTO_TEST_CASE(check_edges_sorting)
     }
 
     // on level 0 every edge is a border edge
-    for (auto node : util::irange<NodeID>(0, 12))
+    for (auto node : util::irange<NodeID>(0, 13))
         CHECK_EQUAL_COLLECTIONS(graph.GetBorderEdgeRange(0, node), graph.GetAdjacentEdgeRange(node));
 
     BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(1, 0).size(),  1);
@@ -99,7 +100,8 @@ BOOST_AUTO_TEST_CASE(check_edges_sorting)
     BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(1, 8).size(),  0);
     BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(1, 9).size(),  0);
     BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(1, 10).size(), 0);
-    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(1, 11).size(), 1);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(1, 11).size(), 2);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(1, 12).size(), 1);
 
     BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(2, 0).size(),  1);
     BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(2, 1).size(),  0);
@@ -112,7 +114,8 @@ BOOST_AUTO_TEST_CASE(check_edges_sorting)
     BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(2, 8).size(),  0);
     BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(2, 9).size(),  0);
     BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(2, 10).size(), 0);
-    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(2, 11).size(), 1);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(2, 11).size(), 2);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(2, 12).size(), 1);
 
     BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(3, 0).size(),  1);
     BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(3, 1).size(),  0);
@@ -125,7 +128,8 @@ BOOST_AUTO_TEST_CASE(check_edges_sorting)
     BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(3, 8).size(),  0);
     BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(3, 9).size(),  0);
     BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(3, 10).size(), 0);
-    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(3, 11).size(), 0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(3, 11).size(), 1);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(3, 12).size(), 1);
 
     BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(4, 0).size(),  0);
     BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(4, 1).size(),  0);
@@ -138,26 +142,34 @@ BOOST_AUTO_TEST_CASE(check_edges_sorting)
     BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(4, 8).size(),  0);
     BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(4, 9).size(),  0);
     BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(4, 10).size(), 0);
-    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(4, 11).size(), 0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(4, 11).size(), 1);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(3, 12).size(), 1);
 
     CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(1, 0),  graph.FindEdge(0, 4));
     CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(1, 3),  graph.FindEdge(3, 7));
     CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(1, 4),  graph.FindEdge(4, 6), graph.FindEdge(4, 0));
     CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(1, 5),  graph.FindEdge(5, 6));
-    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(1, 6),  graph.FindEdge(6, 5), graph.FindEdge(6, 4));
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(1, 6),  graph.FindEdge(6, 4), graph.FindEdge(6, 5));
     CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(1, 7),  graph.FindEdge(7, 11), graph.FindEdge(7, 3));
-    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(1, 11), graph.FindEdge(11, 7));
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(1, 11), graph.FindEdge(11, 7), graph.FindEdge(11, 12));
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(1, 12), graph.FindEdge(12, 11));
 
     CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(2, 0),  graph.FindEdge(0, 4));
     CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(2, 3),  graph.FindEdge(3, 7));
     CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(2, 4),  graph.FindEdge(4, 0));
     CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(2, 7),  graph.FindEdge(7, 11), graph.FindEdge(7, 3));
-    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(2, 11), graph.FindEdge(11, 7));
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(2, 11), graph.FindEdge(11, 7), graph.FindEdge(11, 12));
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(2, 12), graph.FindEdge(12, 11));
 
     CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(3, 0),  graph.FindEdge(0, 4));
     CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(3, 3),  graph.FindEdge(3, 7));
     CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(3, 4),  graph.FindEdge(4, 0));
     CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(3, 7),  graph.FindEdge(7, 3));
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(3, 11), graph.FindEdge(11, 12));
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(3, 12), graph.FindEdge(12, 11));
+
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(4, 11), graph.FindEdge(11, 12));
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(4, 12), graph.FindEdge(12, 11));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

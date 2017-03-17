@@ -5,6 +5,8 @@
 
 #include "util/static_graph.hpp"
 
+#include <tbb/parallel_sort.h>
+
 #include <boost/iterator/permutation_iterator.hpp>
 #include <boost/range/combine.hpp>
 
@@ -102,7 +104,7 @@ class MultiLevelGraph : public util::StaticGraph<EdgeDataT, UseSharedMemory>
     EdgeID BeginBorderEdges(const LevelID level, const NodeID node) const
     {
         auto index = node * GetNumberOfLevels();
-        if (index >= node_to_edge_offset.size()-1)
+        if (index >= node_to_edge_offset.size() - 1)
             return SuperT::BeginEdges(node);
         else
             return SuperT::BeginEdges(node) + node_to_edge_offset[index + level];
@@ -129,12 +131,12 @@ class MultiLevelGraph : public util::StaticGraph<EdgeDataT, UseSharedMemory>
     {
         std::vector<std::uint32_t> permutation(edges.size());
         std::iota(permutation.begin(), permutation.end(), 0);
-        std::sort(permutation.begin(),
+        tbb::parallel_sort(permutation.begin(),
                   permutation.end(),
                   [&edges, &highest_border_level](const auto &lhs, const auto &rhs) {
                       // sort by source node and then by level in acending order
-                      return std::tie(edges[lhs].source, highest_border_level[lhs]) <
-                             std::tie(edges[rhs].source, highest_border_level[rhs]);
+                      return std::tie(edges[lhs].source, highest_border_level[lhs], edges[lhs].target) <
+                             std::tie(edges[rhs].source, highest_border_level[rhs], edges[rhs].target);
                   });
 
         return permutation;
@@ -155,7 +157,7 @@ class MultiLevelGraph : public util::StaticGraph<EdgeDataT, UseSharedMemory>
         {
             node_to_edge_offset.push_back(0);
             auto level_begin = iter;
-            for (auto level : util::irange<LevelID>(0, mlp.GetNumberOfLevels() - 1))
+            for (auto level : util::irange<LevelID>(0, mlp.GetNumberOfLevels()))
             {
                 iter = std::find_if(
                     iter, edge_and_level_end, [node, level](const auto &edge_and_level) {
@@ -165,6 +167,7 @@ class MultiLevelGraph : public util::StaticGraph<EdgeDataT, UseSharedMemory>
                 EdgeOffset offset = std::distance(level_begin, iter);
                 node_to_edge_offset.push_back(offset);
             }
+            node_to_edge_offset.pop_back();
         }
         BOOST_ASSERT(node_to_edge_offset.size() ==
                      mlp.GetNumberOfLevels() * (max_border_node_id + 1));
