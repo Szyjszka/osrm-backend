@@ -455,7 +455,7 @@ void Storage::PopulateLayout(DataLayout &layout)
                 DataLayout::MLD_GRAPH_NODE_LIST, num_nodes);
             layout.SetBlockSize<customizer::MultiLevelEdgeBasedGraph::EdgeArrayEntry>(
                 DataLayout::MLD_GRAPH_EDGE_LIST, num_edges);
-            layout.SetBlockSize<LevelID>(DataLayout::MLD_GRAPH_EDGE_TO_LEVEL, num_edges);
+            layout.SetBlockSize<customizer::MultiLevelEdgeBasedGraph::EdgeOffset>(DataLayout::MLD_GRAPH_NODE_TO_OFFSET, num_edges);
         }
         else
         {
@@ -463,7 +463,7 @@ void Storage::PopulateLayout(DataLayout &layout)
                 DataLayout::MLD_GRAPH_NODE_LIST, 0);
             layout.SetBlockSize<customizer::MultiLevelEdgeBasedGraph::EdgeArrayEntry>(
                 DataLayout::MLD_GRAPH_EDGE_LIST, 0);
-            layout.SetBlockSize<LevelID>(DataLayout::MLD_GRAPH_EDGE_TO_LEVEL, 0);
+            layout.SetBlockSize<customizer::MultiLevelEdgeBasedGraph::EdgeOffset>(DataLayout::MLD_GRAPH_NODE_TO_OFFSET, 0);
         }
     }
 }
@@ -945,15 +945,15 @@ void Storage::PopulateData(const DataLayout &layout, char *memory_ptr)
             auto edges_ptr =
                 layout.GetBlockPtr<customizer::MultiLevelEdgeBasedGraph::EdgeArrayEntry, true>(
                     memory_ptr, DataLayout::MLD_GRAPH_EDGE_LIST);
-            auto edge_to_level_ptr =
-                layout.GetBlockPtr<LevelID, true>(memory_ptr, DataLayout::MLD_GRAPH_EDGE_TO_LEVEL);
+            auto node_to_offset_ptr =
+                layout.GetBlockPtr<customizer::MultiLevelEdgeBasedGraph::EdgeOffset, true>(memory_ptr, DataLayout::MLD_GRAPH_NODE_TO_OFFSET);
 
             auto num_nodes = reader.ReadElementCount64();
             reader.ReadInto(nodes_ptr, num_nodes);
             auto num_edges = reader.ReadElementCount64();
             reader.ReadInto(edges_ptr, num_edges);
-            auto num_edge_to_level = reader.ReadElementCount64();
-            reader.ReadInto(edge_to_level_ptr, num_edge_to_level);
+            auto num_node_to_offset = reader.ReadElementCount64();
+            reader.ReadInto(node_to_offset_ptr, num_node_to_offset);
         }
     }
 }

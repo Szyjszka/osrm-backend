@@ -995,17 +995,17 @@ class ContiguousInternalMemoryAlgorithmDataFacade<algorithm::MLD>
         auto graph_edges_ptr = data_layout.GetBlockPtr<GraphEdge>(
             memory_block, storage::DataLayout::MLD_GRAPH_EDGE_LIST);
 
-        auto graph_edge_to_level_ptr = data_layout.GetBlockPtr<LevelID>(
-            memory_block, storage::DataLayout::MLD_GRAPH_EDGE_TO_LEVEL);
+        auto graph_node_to_offset_ptr = data_layout.GetBlockPtr<QueryGraph::EdgeOffset>(
+            memory_block, storage::DataLayout::MLD_GRAPH_NODE_TO_OFFSET);
 
         util::ShM<GraphNode, true>::vector node_list(
             graph_nodes_ptr, data_layout.num_entries[storage::DataLayout::MLD_GRAPH_NODE_LIST]);
         util::ShM<GraphEdge, true>::vector edge_list(
             graph_edges_ptr, data_layout.num_entries[storage::DataLayout::MLD_GRAPH_EDGE_LIST]);
-        util::ShM<LevelID, true>::vector edge_to_level(
-            graph_edge_to_level_ptr, data_layout.num_entries[storage::DataLayout::MLD_GRAPH_EDGE_TO_LEVEL]);
+        util::ShM<QueryGraph::EdgeOffset, true>::vector node_to_offset(
+            graph_node_to_offset_ptr, data_layout.num_entries[storage::DataLayout::MLD_GRAPH_NODE_TO_OFFSET]);
 
-        query_graph = QueryGraph(node_list, edge_list, edge_to_level);
+        query_graph = QueryGraph(node_list, edge_list, node_to_offset);
     }
 
     // allocator that keeps the allocation data

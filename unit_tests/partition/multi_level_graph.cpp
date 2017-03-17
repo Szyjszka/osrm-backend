@@ -1,6 +1,8 @@
 #include "partition/multi_level_graph.hpp"
 #include "util/typedefs.hpp"
 
+#include "../common/range_tools.hpp"
+
 #include <boost/test/test_case_template.hpp>
 #include <boost/test/unit_test.hpp>
 
@@ -73,14 +75,89 @@ BOOST_AUTO_TEST_CASE(check_edges_sorting)
 
     for (auto from : util::irange(0u, graph.GetNumberOfNodes()))
     {
-        LevelID level = INVALID_LEVEL_ID;
+        LevelID level = 0;
         for (auto edge : graph.GetAdjacentEdgeRange(from))
         {
             auto to = graph.GetTarget(edge);
-            BOOST_CHECK(mlp.GetHighestDifferentLevel(from, to) <= level);
+            BOOST_CHECK(mlp.GetHighestDifferentLevel(from, to) >= level);
             level = mlp.GetHighestDifferentLevel(from, to);
         }
     }
+
+    // on level 0 every edge is a border edge
+    for (auto node : util::irange<NodeID>(0, 12))
+        CHECK_EQUAL_COLLECTIONS(graph.GetBorderEdgeRange(0, node), graph.GetAdjacentEdgeRange(node));
+
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(1, 0).size(),  1);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(1, 1).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(1, 2).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(1, 3).size(),  1);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(1, 4).size(),  2);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(1, 5).size(),  1);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(1, 6).size(),  2);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(1, 7).size(),  2);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(1, 8).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(1, 9).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(1, 10).size(), 0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(1, 11).size(), 1);
+
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(2, 0).size(),  1);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(2, 1).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(2, 2).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(2, 3).size(),  1);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(2, 4).size(),  1);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(2, 5).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(2, 6).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(2, 7).size(),  2);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(2, 8).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(2, 9).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(2, 10).size(), 0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(2, 11).size(), 1);
+
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(3, 0).size(),  1);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(3, 1).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(3, 2).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(3, 3).size(),  1);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(3, 4).size(),  1);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(3, 5).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(3, 6).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(3, 7).size(),  1);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(3, 8).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(3, 9).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(3, 10).size(), 0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(3, 11).size(), 0);
+
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(4, 0).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(4, 1).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(4, 2).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(4, 3).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(4, 4).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(4, 5).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(4, 6).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(4, 7).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(4, 8).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(4, 9).size(),  0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(4, 10).size(), 0);
+    BOOST_CHECK_EQUAL(graph.GetBorderEdgeRange(4, 11).size(), 0);
+
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(1, 0),  graph.FindEdge(0, 4));
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(1, 3),  graph.FindEdge(3, 7));
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(1, 4),  graph.FindEdge(4, 6), graph.FindEdge(4, 0));
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(1, 5),  graph.FindEdge(5, 6));
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(1, 6),  graph.FindEdge(6, 5), graph.FindEdge(6, 4));
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(1, 7),  graph.FindEdge(7, 11), graph.FindEdge(7, 3));
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(1, 11), graph.FindEdge(11, 7));
+
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(2, 0),  graph.FindEdge(0, 4));
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(2, 3),  graph.FindEdge(3, 7));
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(2, 4),  graph.FindEdge(4, 0));
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(2, 7),  graph.FindEdge(7, 11), graph.FindEdge(7, 3));
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(2, 11), graph.FindEdge(11, 7));
+
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(3, 0),  graph.FindEdge(0, 4));
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(3, 3),  graph.FindEdge(3, 7));
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(3, 4),  graph.FindEdge(4, 0));
+    CHECK_EQUAL_RANGE(graph.GetBorderEdgeRange(3, 7),  graph.FindEdge(7, 3));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -6,6 +6,7 @@
 #include "util/static_graph.hpp"
 
 #include <boost/iterator/permutation_iterator.hpp>
+#include <boost/range/combine.hpp>
 
 namespace osrm
 {
@@ -31,13 +32,17 @@ class MultiLevelGraph : public util::StaticGraph<EdgeDataT, UseSharedMemory>
     template <typename T> using Vector = typename util::ShM<T, UseSharedMemory>::vector;
 
   public:
+    // We limit each node to have 255 edges
+    // this is very generous, we could probably pack this
+    using EdgeOffset = std::uint8_t;
+
     MultiLevelGraph() = default;
 
     MultiLevelGraph(Vector<typename SuperT::NodeArrayEntry> node_array_,
                     Vector<typename SuperT::EdgeArrayEntry> edge_array_,
-                    Vector<LevelID> edge_to_level_)
+                    Vector<EdgeOffset> node_to_edge_offset_)
         : SuperT(std::move(node_array_), std::move(edge_array_)),
-          edge_to_level(std::move(edge_to_level_))
+          node_to_edge_offset(std::move(node_to_edge_offset_))
     {
     }
 
@@ -48,69 +53,63 @@ class MultiLevelGraph : public util::StaticGraph<EdgeDataT, UseSharedMemory>
     {
         auto highest_border_level = GetHighestBorderLevel(mlp, edges);
         auto permutation = SortEdgesByHighestLevel(highest_border_level, edges);
-        SuperT::InitializeFromSortedEdgeRange(
-            num_nodes,
-            boost::make_permutation_iterator(edges.begin(), permutation.begin()),
-            boost::make_permutation_iterator(edges.begin(), permutation.end()));
+        auto sorted_edges_begin =
+            boost::make_permutation_iterator(edges.begin(), permutation.begin());
+        auto sorted_edges_end = boost::make_permutation_iterator(edges.begin(), permutation.end());
+        SuperT::InitializeFromSortedEdgeRange(num_nodes, sorted_edges_begin, sorted_edges_end);
 
         // if the node ordering is sorting the border nodes first,
-        // the id of the maximum border edge will be rather low as they will
-        // also only be in the front part of the edge array
-        auto max_border_edge_id = 0u;
-        std::for_each(permutation.begin(),
-                      permutation.end(),
-                      [&highest_border_level, &max_border_edge_id](auto idx) {
-                          if (highest_border_level[idx] > 0)
-                              max_border_edge_id = std::max(idx, max_border_edge_id);
-                      });
-        BOOST_ASSERT(max_border_edge_id < permutation.size());
-
-        const auto upper_bound_border_edges = max_border_edge_id + 1;
-        edge_to_level.resize(upper_bound_border_edges);
-        std::copy(
-            boost::make_permutation_iterator(highest_border_level.begin(), permutation.begin()),
-            boost::make_permutation_iterator(highest_border_level.begin(),
-                                             permutation.begin() + upper_bound_border_edges),
-            edge_to_level.begin());
-    }
-
-    // Fast scan over all relevant border edges since we can terminate if we know they
-    // are sorted descending by level on which they are relevant
-    template <typename Func>
-    void ForAllBorderEdges(const LevelID level, const NodeID node, Func func) const
-    {
-        for (auto edge : SuperT::GetAdjacentEdgeRange(node))
+        // the id of the maximum border node will be rather low
+        // enabling us to save some memory here
+        auto max_border_node_id = 0u;
+        for (auto edge_index : util::irange<std::size_t>(0, edges.size()))
         {
-            if (!IsBorderEdge(level, edge))
-                return;
-
-            func(edge);
+            if (highest_border_level[edge_index] > 0)
+            {
+                max_border_node_id =
+                    std::max(max_border_node_id,
+                             std::max(edges[edge_index].source, edges[edge_index].target));
+            }
         }
+        BOOST_ASSERT(max_border_node_id < num_nodes);
+
+        auto edge_and_level_range = boost::combine(edges, highest_border_level);
+        auto sorted_edge_and_level_begin =
+            boost::make_permutation_iterator(edge_and_level_range.begin(), permutation.begin());
+        auto sorted_edge_and_level_end =
+            boost::make_permutation_iterator(edge_and_level_range.begin(), permutation.end());
+        InitializeOffsetsFromSortedEdges(
+            mlp, max_border_node_id, sorted_edge_and_level_begin, sorted_edge_and_level_end);
     }
 
-    // Fast scan over all relevant internal edges since we can terminate if we know they
-    // are sorted descending by level on which they are relevant
-    template <typename Func>
-    void ForAllInternalEdges(const LevelID level, const NodeID node, Func func) const
+    // Fast scan over all relevant border edges
+    auto GetBorderEdgeRange(const LevelID level, const NodeID node) const
     {
-        for (auto edge : boost::adaptors::reverse(SuperT::GetAdjacentEdgeRange(node)))
-        {
-            if (!IsInternalEdge(level, edge))
-                return;
-
-            func(edge);
-        }
+        auto begin = BeginBorderEdges(level, node);
+        auto end = SuperT::EndEdges(node);
+        return util::irange<EdgeID>(begin, end);
     }
 
-    bool IsBorderEdge(LevelID level, EdgeID edge) const
+    // Fast scan over all relevant internal edges, that is edges that will not
+    // leave the cell of that node at the given level
+    auto GetInternalEdgeRange(const LevelID level, const NodeID node) const
     {
-        return edge < edge_to_level.size() && edge_to_level[edge] <= level;
+        auto begin = SuperT::BeginEdges(node);
+        auto end = SuperT::BeginEdges(node) + node_to_edge_offset[node + level];
+        return util::irange<EdgeID>(begin, end);
     }
 
-    bool IsInternalEdge(LevelID level, EdgeID edge) const
+    EdgeID BeginBorderEdges(const LevelID level, const NodeID node) const
     {
-        return edge < edge_to_level.size() || edge_to_level[edge] > level;
+        auto index = node * GetNumberOfLevels();
+        if (index >= node_to_edge_offset.size())
+            return SuperT::BeginEdges(node);
+        else
+            return SuperT::BeginEdges(node) + node_to_edge_offset[index + level];
     }
+
+    // We save the level as senitel at the end
+    LevelID GetNumberOfLevels() const { return node_to_edge_offset.back(); }
 
   private:
     template <typename ContainerT>
@@ -133,12 +132,44 @@ class MultiLevelGraph : public util::StaticGraph<EdgeDataT, UseSharedMemory>
         std::sort(permutation.begin(),
                   permutation.end(),
                   [&edges, &highest_border_level](const auto &lhs, const auto &rhs) {
-                      // sort by source node and then by level in _decreasing_ order
-                      return std::tie(edges[lhs].source, highest_border_level[rhs]) <
-                             std::tie(edges[rhs].source, highest_border_level[lhs]);
+                      // sort by source node and then by level in acending order
+                      return std::tie(edges[lhs].source, highest_border_level[lhs]) <
+                             std::tie(edges[rhs].source, highest_border_level[rhs]);
                   });
 
         return permutation;
+    }
+
+    template <typename ZipIterT>
+    auto InitializeOffsetsFromSortedEdges(const MultiLevelPartition &mlp,
+                                          const NodeID max_border_node_id,
+                                          ZipIterT edge_and_level_begin,
+                                          ZipIterT edge_and_level_end)
+    {
+
+        auto num_levels = mlp.GetNumberOfLevels();
+        // we save one senitel element at the end
+        node_to_edge_offset.reserve(num_levels * (max_border_node_id + 1) + 1);
+        auto iter = edge_and_level_begin;
+        for (auto node : util::irange<NodeID>(0, max_border_node_id + 1))
+        {
+            node_to_edge_offset.push_back(0);
+            auto level_begin = iter;
+            for (auto level : util::irange<LevelID>(0, mlp.GetNumberOfLevels() - 1))
+            {
+                iter = std::find_if(
+                    iter, edge_and_level_end, [node, level](const auto &edge_and_level) {
+                        return boost::get<0>(edge_and_level).source != node ||
+                               boost::get<1>(edge_and_level) != level;
+                    });
+                EdgeOffset offset = std::distance(level_begin, iter);
+                node_to_edge_offset.push_back(offset);
+            }
+        }
+        BOOST_ASSERT(node_to_edge_offset.size() ==
+                     mlp.GetNumberOfLevels() * (max_border_node_id + 1));
+        // save number of levels as last element so we can reconstruct the stride
+        node_to_edge_offset.push_back(mlp.GetNumberOfLevels());
     }
 
     friend void
@@ -148,7 +179,7 @@ class MultiLevelGraph : public util::StaticGraph<EdgeDataT, UseSharedMemory>
     io::write<EdgeDataT, UseSharedMemory>(const boost::filesystem::path &path,
                                           const MultiLevelGraph<EdgeDataT, UseSharedMemory> &graph);
 
-    Vector<LevelID> edge_to_level;
+    Vector<EdgeOffset> node_to_edge_offset;
 };
 }
 }

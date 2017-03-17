@@ -34,7 +34,7 @@ inline void write(const boost::filesystem::path &path, const MultiLevelGraph<Edg
 
     writer.SerializeVector(graph.node_array);
     writer.SerializeVector(graph.edge_array);
-    writer.SerializeVector(graph.edge_to_level);
+    writer.SerializeVector(graph.node_to_edge_offset);
 }
 
 template <> inline void read(const boost::filesystem::path &path, MultiLevelPartition &mlp)
