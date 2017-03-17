@@ -11,6 +11,17 @@ namespace osrm
 {
 namespace partition
 {
+template <typename EdgeDataT, bool UseSharedMemory> class MultiLevelGraph;
+
+namespace io
+{
+template <typename EdgeDataT, bool UseSharedMemory>
+void read(const boost::filesystem::path &path, MultiLevelGraph<EdgeDataT, UseSharedMemory> &graph);
+
+template <typename EdgeDataT, bool UseSharedMemory>
+void write(const boost::filesystem::path &path,
+           const MultiLevelGraph<EdgeDataT, UseSharedMemory> &graph);
+}
 
 template <typename EdgeDataT, bool UseSharedMemory>
 class MultiLevelGraph : public util::StaticGraph<EdgeDataT, UseSharedMemory>
@@ -20,6 +31,16 @@ class MultiLevelGraph : public util::StaticGraph<EdgeDataT, UseSharedMemory>
     template <typename T> using Vector = typename util::ShM<T, UseSharedMemory>::vector;
 
   public:
+    MultiLevelGraph() = default;
+
+    MultiLevelGraph(Vector<typename SuperT::NodeArrayEntry> node_array_,
+                    Vector<typename SuperT::EdgeArrayEntry> edge_array_,
+                    Vector<LevelID> edge_to_level_)
+        : SuperT(std::move(node_array_), std::move(edge_array_)),
+          edge_to_level(std::move(edge_to_level_))
+    {
+    }
+
     template <typename ContainerT>
     MultiLevelGraph(const MultiLevelPartition &mlp,
                     const std::uint32_t num_nodes,
@@ -60,7 +81,7 @@ class MultiLevelGraph : public util::StaticGraph<EdgeDataT, UseSharedMemory>
     {
         for (auto edge : SuperT::GetAdjacentEdgeRange(node))
         {
-            if (!isBorderEdge(level, edge))
+            if (!IsBorderEdge(level, edge))
                 return;
 
             func(edge);
@@ -119,6 +140,13 @@ class MultiLevelGraph : public util::StaticGraph<EdgeDataT, UseSharedMemory>
 
         return permutation;
     }
+
+    friend void
+    io::read<EdgeDataT, UseSharedMemory>(const boost::filesystem::path &path,
+                                         MultiLevelGraph<EdgeDataT, UseSharedMemory> &graph);
+    friend void
+    io::write<EdgeDataT, UseSharedMemory>(const boost::filesystem::path &path,
+                                          const MultiLevelGraph<EdgeDataT, UseSharedMemory> &graph);
 
     Vector<LevelID> edge_to_level;
 };

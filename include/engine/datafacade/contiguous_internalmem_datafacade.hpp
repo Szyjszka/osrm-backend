@@ -902,10 +902,17 @@ class ContiguousInternalMemoryAlgorithmDataFacade<algorithm::MLD>
     // MLD data
     partition::MultiLevelPartitionView mld_partition;
     partition::CellStorageView mld_cell_storage;
+    using QueryGraph = customizer::MultiLevelEdgeBasedGraphView;
+    using GraphNode = QueryGraph::NodeArrayEntry;
+    using GraphEdge = QueryGraph::EdgeArrayEntry;
+
+    QueryGraph query_graph;
+
 
     void InitializeInternalPointers(storage::DataLayout &data_layout, char *memory_block)
     {
         InitializeMLDDataPointers(data_layout, memory_block);
+        InitializeGraphPointer(data_layout, memory_block);
     }
 
     void InitializeMLDDataPointers(storage::DataLayout &data_layout, char *memory_block)
@@ -980,6 +987,26 @@ class ContiguousInternalMemoryAlgorithmDataFacade<algorithm::MLD>
                                                           std::move(level_offsets)};
         }
     }
+    void InitializeGraphPointer(storage::DataLayout &data_layout, char *memory_block)
+    {
+        auto graph_nodes_ptr = data_layout.GetBlockPtr<GraphNode>(
+            memory_block, storage::DataLayout::MLD_GRAPH_NODE_LIST);
+
+        auto graph_edges_ptr = data_layout.GetBlockPtr<GraphEdge>(
+            memory_block, storage::DataLayout::MLD_GRAPH_EDGE_LIST);
+
+        auto graph_edge_to_level_ptr = data_layout.GetBlockPtr<LevelID>(
+            memory_block, storage::DataLayout::MLD_GRAPH_EDGE_TO_LEVEL);
+
+        util::ShM<GraphNode, true>::vector node_list(
+            graph_nodes_ptr, data_layout.num_entries[storage::DataLayout::MLD_GRAPH_NODE_LIST]);
+        util::ShM<GraphEdge, true>::vector edge_list(
+            graph_edges_ptr, data_layout.num_entries[storage::DataLayout::MLD_GRAPH_EDGE_LIST]);
+        util::ShM<LevelID, true>::vector edge_to_level(
+            graph_edge_to_level_ptr, data_layout.num_entries[storage::DataLayout::MLD_GRAPH_EDGE_TO_LEVEL]);
+
+        query_graph = QueryGraph(node_list, edge_list, edge_to_level);
+    }
 
     // allocator that keeps the allocation data
     std::shared_ptr<ContiguousBlockAllocator> allocator;
@@ -992,12 +1019,44 @@ class ContiguousInternalMemoryAlgorithmDataFacade<algorithm::MLD>
         InitializeInternalPointers(allocator->GetLayout(), allocator->GetMemory());
     }
 
-    const partition::MultiLevelPartitionView &GetMultiLevelPartition() const
+    const partition::MultiLevelPartitionView &GetMultiLevelPartition() const override
     {
         return mld_partition;
     }
 
-    const partition::CellStorageView &GetCellStorage() const { return mld_cell_storage; }
+    const partition::CellStorageView &GetCellStorage() const override { return mld_cell_storage; }
+
+    // search graph access
+    unsigned GetNumberOfNodes() const override final { return query_graph.GetNumberOfNodes(); }
+
+    unsigned GetNumberOfEdges() const override final { return query_graph.GetNumberOfEdges(); }
+
+    unsigned GetOutDegree(const NodeID n) const override final
+    {
+        return query_graph.GetOutDegree(n);
+    }
+
+    NodeID GetTarget(const EdgeID e) const override final { return query_graph.GetTarget(e); }
+
+    const EdgeData &GetEdgeData(const EdgeID e) const override final
+    {
+        return query_graph.GetEdgeData(e);
+    }
+
+    EdgeID BeginEdges(const NodeID n) const override final { return query_graph.BeginEdges(n); }
+
+    EdgeID EndEdges(const NodeID n) const override final { return query_graph.EndEdges(n); }
+
+    EdgeRange GetAdjacentEdgeRange(const NodeID node) const override final
+    {
+        return query_graph.GetAdjacentEdgeRange(node);
+    }
+
+    // searches for a specific edge
+    EdgeID FindEdge(const NodeID from, const NodeID to) const override final
+    {
+        return query_graph.FindEdge(from, to);
+    }
 };
 
 template <>
@@ -1006,27 +1065,6 @@ class ContiguousInternalMemoryDataFacade<algorithm::MLD>
       public ContiguousInternalMemoryAlgorithmDataFacade<algorithm::MLD>
 {
   private:
-    using QueryGraph = customizer::StaticEdgeBasedGraphView;
-    using GraphNode = QueryGraph::NodeArrayEntry;
-    using GraphEdge = QueryGraph::EdgeArrayEntry;
-
-    std::unique_ptr<QueryGraph> m_query_graph;
-
-    void InitializeGraphPointer(storage::DataLayout &data_layout, char *memory_block)
-    {
-        auto graph_nodes_ptr = data_layout.GetBlockPtr<GraphNode>(
-            memory_block, storage::DataLayout::MLD_GRAPH_NODE_LIST);
-
-        auto graph_edges_ptr = data_layout.GetBlockPtr<GraphEdge>(
-            memory_block, storage::DataLayout::MLD_GRAPH_EDGE_LIST);
-
-        util::ShM<GraphNode, true>::vector node_list(
-            graph_nodes_ptr, data_layout.num_entries[storage::DataLayout::MLD_GRAPH_NODE_LIST]);
-        util::ShM<GraphEdge, true>::vector edge_list(
-            graph_edges_ptr, data_layout.num_entries[storage::DataLayout::MLD_GRAPH_EDGE_LIST]);
-
-        m_query_graph.reset(new QueryGraph(node_list, edge_list));
-    }
 
   public:
     ContiguousInternalMemoryDataFacade(std::shared_ptr<ContiguousBlockAllocator> allocator)
@@ -1034,44 +1072,6 @@ class ContiguousInternalMemoryDataFacade<algorithm::MLD>
           ContiguousInternalMemoryAlgorithmDataFacade<algorithm::MLD>(allocator)
 
     {
-        InitializeInternalPointers(allocator->GetLayout(), allocator->GetMemory());
-    }
-
-    void InitializeInternalPointers(storage::DataLayout &data_layout, char *memory_block)
-    {
-        InitializeGraphPointer(data_layout, memory_block);
-    }
-
-    // search graph access
-    unsigned GetNumberOfNodes() const override final { return m_query_graph->GetNumberOfNodes(); }
-
-    unsigned GetNumberOfEdges() const override final { return m_query_graph->GetNumberOfEdges(); }
-
-    unsigned GetOutDegree(const NodeID n) const override final
-    {
-        return m_query_graph->GetOutDegree(n);
-    }
-
-    NodeID GetTarget(const EdgeID e) const override final { return m_query_graph->GetTarget(e); }
-
-    EdgeData &GetEdgeData(const EdgeID e) const override final
-    {
-        return m_query_graph->GetEdgeData(e);
-    }
-
-    EdgeID BeginEdges(const NodeID n) const override final { return m_query_graph->BeginEdges(n); }
-
-    EdgeID EndEdges(const NodeID n) const override final { return m_query_graph->EndEdges(n); }
-
-    EdgeRange GetAdjacentEdgeRange(const NodeID node) const override final
-    {
-        return m_query_graph->GetAdjacentEdgeRange(node);
-    }
-
-    // searches for a specific edge
-    EdgeID FindEdge(const NodeID from, const NodeID to) const override final
-    {
-        return m_query_graph->FindEdge(from, to);
     }
 };
 }
